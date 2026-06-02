@@ -21,7 +21,9 @@ class Warga extends Authenticatable
         'username',
         'password',
         'role',
-        'blok'
+        'blok',
+        'nik',
+        'status_warga'
     ];
 
     // Menyembunyikan password agar tidak bocor saat data dipanggil

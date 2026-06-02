@@ -16,6 +16,7 @@ use App\Http\Controllers\WargaLaporanController;
 use App\Http\Controllers\ProfileController;
 
 Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'loginUniversal']);
 
 // URL Pintu Admin
 Route::post('/admin/login', [AuthController::class, 'loginAdmin']);
@@ -36,17 +37,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/admin/warga/{id}', [AdminWargaController::class, 'update']);    // Update
     Route::delete('/admin/warga/{id}', [AdminWargaController::class, 'destroy']);// Delete
 
-    // API Manajemen Kas (BARU)
-    Route::get('/admin/kas', [AdminKasController::class, 'index']);  // Ambil Data Halaman
-    Route::post('/admin/kas', [AdminKasController::class, 'store']); // Simpan Transaksi Baru
+   // API Manajemen Kas
+    Route::get('/admin/kas', [AdminKasController::class, 'index']);  
+    Route::post('/admin/kas', [AdminKasController::class, 'store']); 
+    Route::put('/admin/kas/{id}', [AdminKasController::class, 'update']);   // Rute Edit
+    Route::delete('/admin/kas/{id}', [AdminKasController::class, 'destroy']); // Rute Hapus
 
     // API Verifikasi Pembayaran
     Route::get('/admin/verifikasi', [AdminVerifikasiController::class, 'index']);      // Lihat daftar pending
     Route::put('/admin/verifikasi/{id}', [AdminVerifikasiController::class, 'verify']);// Tombol verifikasi
     
     // API Kelola Tagihan Iuran
-    Route::get('/admin/tagihan', [AdminTagihanController::class, 'index']);  // Lihat daftar tagihan
-    Route::post('/admin/tagihan', [AdminTagihanController::class, 'store']); // Buat tagihan baru
+    Route::get('/admin/tagihan', [AdminTagihanController::class, 'index']);  
+    Route::post('/admin/tagihan', [AdminTagihanController::class, 'store']); 
+    Route::put('/admin/tagihan/{id}', [AdminTagihanController::class, 'update']);
     Route::delete('/admin/tagihan/{id}', [AdminTagihanController::class, 'destroy']);
 
     // API Laporan Keuangan (Rekap Bulanan)

@@ -3,82 +3,48 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Tagihan;
 use App\Models\TransaksiKas;
 
 class WargaDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Ambil data warga yang sedang login saat ini
-        $user = $request->user();
+        try {
+            // 1. Ambil data warga yang sedang login
+            $user = $request->user();
 
-        // 2. Ambil semua daftar Tagihan yang statusnya 'aktif'
-        $semuaTagihan = Tagihan::where('status_sistem', 'aktif')
-                               ->orderBy('created_at', 'desc')
-                               ->get();
+            // 2. Hitung jumlah status iuran KHUSUS untuk warga ini
+            $lunasCount = TransaksiKas::where('warga_id', $user->id)->where('status', 'sukses')->count();
+            $ditolakCount = TransaksiKas::where('warga_id', $user->id)->where('status', 'gagal')->count();
+            $menungguCount = TransaksiKas::where('warga_id', $user->id)->where('status', 'pending')->count();
 
-        // Siapkan variabel untuk menghitung ringkasan
-        $lunasCount = 0;
-        $menungguCount = 0;
-        $tunggakanCount = 0;
-        
-        // Siapkan array kosong untuk menampung daftar status iuran
-        $statusIuranTerkini = [];
+            // 3. Ambil 5 riwayat transaksi terbaru untuk ditampilkan di list bawah
+            $riwayatTerkini = TransaksiKas::with('tagihan')
+                                ->where('warga_id', $user->id)
+                                ->orderBy('created_at', 'desc')
+                                ->take(5)
+                                ->get();
 
-        // 3. Lakukan perulangan (looping) untuk mencocokkan setiap tagihan dengan transaksi warga ini
-        foreach ($semuaTagihan as $tagihan) {
-            
-            // Cek apakah warga ini punya riwayat transaksi untuk tagihan ini
-            $transaksi = TransaksiKas::where('warga_id', $user->id)
-                                     ->where('tagihan_id', $tagihan->id)
-                                     ->latest() // Ambil yang paling baru jika warga mencoba bayar 2 kali
-                                     ->first();
+            // 4. Susun balasan JSON
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Data Dashboard Warga berhasil diambil',
+                'data' => [
+                    'profil_warga' => [
+                        'nama' => $user->nama_lengkap,
+                        'blok' => $user->blok ?? '-'
+                    ],
+                    'ringkasan' => [
+                        'lunas' => $lunasCount,
+                        'ditolak' => $ditolakCount,
+                        'menunggu' => $menungguCount
+                    ],
+                    'riwayat_terkini' => $riwayatTerkini
+                ]
+            ], 200);
 
-            $statusPembayaran = 'Belum Bayar'; // Status default
-            $tanggalBayar = null;
-
-            if ($transaksi) {
-                $tanggalBayar = $transaksi->tanggal_transaksi;
-                
-                if ($transaksi->status === 'sukses') {
-                    $statusPembayaran = 'Lunas';
-                    $lunasCount++;
-                } elseif ($transaksi->status === 'pending') {
-                    $statusPembayaran = 'Menunggu Verifikasi';
-                    $menungguCount++;
-                }
-            } else {
-                // Jika tidak ada transaksi sama sekali, berarti menunggak
-                $tunggakanCount++;
-            }
-
-            // Masukkan hasil pengecekan ke dalam daftar
-            $statusIuranTerkini[] = [
-                'id_tagihan' => $tagihan->id,
-                'nama_tagihan' => $tagihan->nama_tagihan,
-                'nominal' => $tagihan->nominal,
-                'status' => $statusPembayaran,
-                'tanggal_bayar' => $tanggalBayar
-            ];
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
-
-        // 4. Susun jawaban untuk dikirim ke Frontend
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data Dashboard Warga berhasil diambil',
-            'data' => [
-                'profil_warga' => [
-                    'nama' => $user->nama_lengkap,
-                    'blok' => $user->blok
-                ],
-                'ringkasan' => [
-                    'lunas' => $lunasCount,
-                    'tunggakan' => $tunggakanCount,
-                    'menunggu' => $menungguCount
-                ],
-                'status_iuran_terkini' => $statusIuranTerkini
-            ]
-        ], 200);
     }
 }

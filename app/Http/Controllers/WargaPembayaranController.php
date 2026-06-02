@@ -6,56 +6,78 @@ use Illuminate\Http\Request;
 use App\Models\TransaksiKas;
 use App\Models\KategoriKas;
 use Illuminate\Support\Facades\Validator;
+use Midtrans\Config;
+use Midtrans\Snap;
 
 class WargaPembayaranController extends Controller
 {
     public function store(Request $request)
     {
-        // 1. Validasi input dari form (termasuk file gambar)
+        // =======================================================
+        // HARDCODE KUNCI ASLI DARI GAMBAR (BYPASS CACHE LARAVEL)
+        // =======================================================
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+        Config::$isProduction = false;
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
+
         $validator = Validator::make($request->all(), [
-            'tagihan_id' => 'required|exists:tagihan,id', // Harus tahu bayar tagihan yang mana
-            'tanggal_pembayaran' => 'required|date',
+            'tagihan_id' => 'required',
+            'tanggal_transaksi' => 'required|date',
             'nominal' => 'required|numeric|min:1',
-            'bukti_transfer' => 'required|image|mimes:jpeg,png,jpg|max:2048', // Wajib gambar, maks 2MB
             'keterangan' => 'nullable|string'
         ]);
 
         if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $kategori = KategoriKas::where('nama_kategori', 'Iuran Bulanan')->first();
+            
+            $transaksi = TransaksiKas::create([
+                'warga_id' => $request->user()->id, 
+
+                'tagihan_id' => $request->tagihan_id === 'lainnya' ? null : $request->tagihan_id, 
+                
+                'jenis' => 'pemasukan',
+                'kategori_id' => $kategori ? $kategori->id : null,
+                'nominal' => $request->nominal,
+                'tanggal_transaksi' => $request->tanggal_transaksi,
+                'keterangan' => $request->keterangan,
+                'metode_pembayaran' => 'midtrans',
+                'bukti_transfer' => null,
+                'status' => 'pending'
+            ]);
+
+            $orderId = 'RT03-' . $transaksi->id . '-' . time();
+
+            $params = [
+                'transaction_details' => [
+                    'order_id' => $orderId,
+                    'gross_amount' => (int) $request->nominal,
+                ],
+                'customer_details' => [
+                    'first_name' => $request->user()->nama_lengkap ?? 'Warga RT 03', 
+                    'email' => $request->user()->email ?? 'warga@rt03.com',
+                ],
+            ];
+
+            // Meminta Token
+            $snapToken = Snap::getSnapToken($params);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Berhasil dibuat!',
+                'snap_token' => $snapToken,
+                'data' => $transaksi
+            ], 201);
+
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'errors' => $validator->errors()
-            ], 400);
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+            ], 500);
         }
-
-        // 2. Proses upload file gambar
-        $pathGambar = null;
-        if ($request->hasFile('bukti_transfer')) {
-            // Gambar disimpan di folder storage/app/public/bukti_transfer
-            $pathGambar = $request->file('bukti_transfer')->store('bukti_transfer', 'public');
-        }
-
-        // 3. Cari ID Kategori untuk 'Iuran Bulanan' (Agar pembukuan kas rapi)
-        $kategori = KategoriKas::where('nama_kategori', 'Iuran Bulanan')->first();
-        $kategoriId = $kategori ? $kategori->id : null;
-
-        // 4. Simpan data ke database
-        $transaksi = TransaksiKas::create([
-            'warga_id' => $request->user()->id, // Diambil dari token warga yang login
-            'tagihan_id' => $request->tagihan_id,
-            'jenis' => 'pemasukan',
-            'kategori_id' => $kategoriId,
-            'nominal' => $request->nominal,
-            'tanggal_transaksi' => $request->tanggal_pembayaran,
-            'keterangan' => $request->keterangan,
-            'metode_pembayaran' => 'qris_manual',
-            'bukti_transfer' => $pathGambar, // Simpan nama/path filenya
-            'status' => 'pending' // Status mengantre untuk diverifikasi admin!
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Bukti pembayaran berhasil dikirim. Silakan tunggu verifikasi Admin.',
-            'data' => $transaksi
-        ], 201);
     }
 }

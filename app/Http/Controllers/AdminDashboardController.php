@@ -24,20 +24,41 @@ class AdminDashboardController extends Controller
                                              ->orderBy('created_at', 'desc')
                                              ->take(5)
                                              ->get();
-                                             
-            // 4. Data Grafik Tren Keuangan (Dibagi per minggu dalam bulan ini)
-            // Mengambil pemasukan sukses bulan ini, lalu disimulasikan ke 4 titik (Minggu 1 - 4)
-            $bulanIni = TransaksiKas::where('jenis', 'pemasukan')
-                            ->where('status', 'sukses')
-                            ->whereMonth('tanggal_transaksi', Carbon::now()->month)
-                            ->sum('nominal');
-                            
-            // Pembagian sederhana untuk visualisasi (Bisa disesuaikan nanti dengan query per-minggu yang riil)
+
+            // 4. Data Grafik Tren Keuangan (Pemasukan per minggu secara Real-time)
+            // Mengambil semua transaksi sukses pada bulan dan tahun ini
+            $transaksiBulanIni = TransaksiKas::where('status', 'sukses')
+                ->whereMonth('tanggal_transaksi', Carbon::now()->month)
+                ->whereYear('tanggal_transaksi', Carbon::now()->year)
+                ->get();
+
+            // Siapkan wadah untuk menampung total per minggu
+            $minggu1 = 0; $minggu2 = 0; $minggu3 = 0; $minggu4 = 0;
+
+            foreach ($transaksiBulanIni as $trx) {
+                // Di sini kita menghitung tren Pemasukan saja.
+                // Jika kamu ingin grafik turun saat ada pengeluaran, ubah $trx->nominal menjadi -$trx->nominal untuk pengeluaran.
+                $nominal = $trx->jenis === 'pemasukan' ? $trx->nominal : 0; 
+                
+                $tanggal = Carbon::parse($trx->tanggal_transaksi)->day;
+
+                // Kelompokkan berdasarkan tanggal
+                if ($tanggal >= 1 && $tanggal <= 7) {
+                    $minggu1 += $nominal;
+                } elseif ($tanggal >= 8 && $tanggal <= 14) {
+                    $minggu2 += $nominal;
+                } elseif ($tanggal >= 15 && $tanggal <= 21) {
+                    $minggu3 += $nominal;
+                } else {
+                    $minggu4 += $nominal; // Tanggal 22 sampai akhir bulan
+                }
+            }
+
             $grafik = [
-                ['name' => 'Minggu 1', 'value' => $bulanIni * 0.2],
-                ['name' => 'Minggu 2', 'value' => $bulanIni * 0.5],
-                ['name' => 'Minggu 3', 'value' => $bulanIni * 0.1],
-                ['name' => 'Minggu 4', 'value' => $bulanIni * 0.2],
+                ['name' => 'Minggu 1', 'value' => $minggu1],
+                ['name' => 'Minggu 2', 'value' => $minggu2],
+                ['name' => 'Minggu 3', 'value' => $minggu3],
+                ['name' => 'Minggu 4', 'value' => $minggu4],
             ];
 
             return response()->json([

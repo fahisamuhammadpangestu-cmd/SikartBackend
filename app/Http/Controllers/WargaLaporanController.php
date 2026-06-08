@@ -16,7 +16,7 @@ class WargaLaporanController extends Controller
         $saldoAkhir = $pemasukanTotal - $pengeluaranTotal;
 
         // 2. Siapkan Mesin Pencari untuk TABEL (Berdasarkan filter)
-        $query = TransaksiKas::with('kategori')->where('status', 'sukses');
+        $query = TransaksiKas::with(['kategori', 'tagihan'])->where('status', 'sukses');
 
         // Filter Bulan (MM)
         if ($request->has('bulan') && $request->bulan != '') {

@@ -14,6 +14,7 @@ use App\Http\Controllers\WargaPembayaranController;
 use App\Http\Controllers\WargaRiwayatController;
 use App\Http\Controllers\WargaLaporanController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PengumumanController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'loginUniversal']);
@@ -60,6 +61,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/profile', [ProfileController::class, 'show']);
     Route::put('/admin/profile', [ProfileController::class, 'update']);
 
+    Route::get('/admin/pengumuman', [PengumumanController::class, 'index']);
+    Route::post('/admin/pengumuman', [PengumumanController::class, 'store']);
+    Route::delete('/admin/pengumuman/{id}', [PengumumanController::class, 'destroy']);
+
     // ==========================================
     // API KHUSUS WARGA / USER
     // ==========================================
@@ -77,6 +82,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Profil Warga
     Route::get('/warga/profile', [ProfileController::class, 'show']);
     Route::put('/warga/profile', [ProfileController::class, 'update']);
+
+    Route::get('/warga/pengumuman', [PengumumanController::class, 'index']);
 
 });
 
